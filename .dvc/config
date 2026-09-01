@@ -1,0 +1,7 @@
+[core]
+    remote = dagshub
+
+# IMPORTANTE: reemplazar la URL de ejemplo ejecutando scripts/configure_dagshub.sh
+# con DAGSHUB_DVC_URL definido en el entorno.
+['remote "dagshub"']
+    url = https://dagshub.com/USUARIO/REPOSITORIO.dvc

@@ -1,0 +1,5 @@
+# Archivos que DVC no necesita recorrer
+.git/
+.venv/
+__pycache__/
+mlruns/
