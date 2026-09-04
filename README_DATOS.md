@@ -1,56 +1,18 @@
-# Paquete de datos — Proyecto Integrador
-## Laboratorio de Minería de Datos — ISTEA
+# Datos de la Entrega 1
 
-Este paquete acompaña el proyecto de Customer Churn del curso.
+El proyecto utiliza `data/raw/customer_churn_historical.csv`, un dataset sintético de telecomunicaciones con 7.043 observaciones y la variable objetivo `Churn`.
 
-### Archivos principales
+Archivos asociados:
 
-- `data/raw/customer_churn_historical.csv`
-  - 7.043 observaciones históricas.
-  - Incluye la variable objetivo `Churn`.
-  - Debe utilizarse para EDA, partición train/test, entrenamiento, evaluación y versionado con DVC.
+- `data/raw/customer_churn_historical.csv.dvc`: referencia utilizada por DVC;
+- `metadata/data_dictionary.csv`: descripción y dominio de las columnas;
+- `metadata/schema.json`: esquema del dataset histórico;
+- `CHECKSUMS.sha256`: hash de los archivos de datos y metadatos incluidos.
 
-- `data/production/customer_churn_current.csv`
-  - 2.500 observaciones que simulan un período posterior de producción.
-  - No incluye `Churn`.
-  - Debe reservarse para la etapa final de monitoreo y análisis de drift.
-  - No utilizar este archivo para entrenar el modelo inicial.
+Reglas aplicadas:
 
-- `data/scoring/scoring_batch.csv`
-  - 100 observaciones sin target.
-  - Puede utilizarse para pruebas batch, ejemplos de inferencia y validación del servicio.
-
-- `metadata/data_dictionary.csv`
-  - Diccionario de campos, tipos y dominios.
-
-- `metadata/schema.json`
-  - Esquema general y metadatos del paquete.
-
-- `examples/predict_request_valid.json`
-  - Ejemplo de payload válido para `POST /predict`.
-
-- `examples/predict_request_invalid.json`
-  - Ejemplo deliberadamente inválido para probar validaciones de Pydantic.
-
-### Reglas de uso
-
-1. `customerID` es un identificador y no debe utilizarse directamente como feature predictiva.
-2. Existen faltantes intencionales en `TotalCharges`; deben ser tratados dentro del pipeline.
-3. Los datos históricos deben ser incorporados a DVC y no versionados directamente como dataset dentro de Git.
-4. El conjunto `production/current` se reserva para la etapa de monitoreo. No debe utilizarse para mejorar el modelo antes de esa etapa.
-5. El equipo debe generar su propia división train/test a partir del histórico, usando un procedimiento reproducible.
-6. No se entrega una partición "correcta" ni un conjunto de hiperparámetros predefinido: esas decisiones forman parte del trabajo.
-7. El dataset es sintético y no contiene datos personales reales.
-
-### Objetivo pedagógico
-
-Los datos fueron construidos para permitir:
-- variables numéricas y categóricas;
-- valores faltantes;
-- clasificación binaria no trivial;
-- comparación de varios modelos tradicionales;
-- uso de `Pipeline` y `ColumnTransformer`;
-- trazabilidad con DVC y MLflow;
-- serving mediante FastAPI;
-- pruebas de contratos;
-- análisis posterior de data drift.
+1. `customerID` se conserva para identificar registros, pero no se usa como predictor.
+2. Los faltantes de `TotalCharges` se resuelven dentro del pipeline.
+3. El CSV histórico se versiona con DVC y no se incorpora directamente a Git.
+4. La división de entrenamiento, validación y test se genera de manera reproducible.
+5. El dataset es sintético y no contiene datos personales reales.

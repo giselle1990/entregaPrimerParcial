@@ -1,38 +1,70 @@
-# Informe técnico — Primer Parcial
-## Laboratorio de Minería de Datos — Customer Churn
+# Informe del primer parcial
 
-## Objetivo de la etapa
+## Objetivo
 
-Construir una primera versión reproducible y trazable del proyecto de Customer Churn, pasando del dataset/notebook exploratorio a un flujo Python versionable con Git, datos gestionados por DVC y experimentación/modelado preparada para MLflow y Model Registry.
+El trabajo busca detectar clientes con riesgo de churn y, al mismo tiempo, construir un entrenamiento que se pueda repetir y auditar. Por eso se versionan el código con Git, los datos con DVC y los experimentos con MLflow.
 
-## Datos utilizados
+## Datos y preparación
 
-El histórico contiene 7.043 observaciones y 21 columnas. `Churn` es la variable objetivo y presenta 1.857 casos positivos (26,37%) y 5.186 negativos (73,63%). `customerID` se excluye del entrenamiento por ser un identificador. Se detectan 26 valores faltantes en `TotalCharges`, que se resuelven dentro del pipeline mediante imputación por mediana.
+El histórico tiene 7.043 clientes y 21 columnas. Hay 1.857 casos de churn (26,37%). `customerID` se descarta porque identifica al cliente pero no aporta una característica generalizable.
 
-El archivo `customer_churn_current.csv` no se utiliza en esta etapa porque queda reservado para el análisis posterior de drift. El archivo `scoring_batch.csv` tampoco interviene en el entrenamiento inicial.
+`TotalCharges` tiene 26 valores faltantes. No se rellenan directamente en el CSV: la imputación queda dentro del pipeline para aplicar la misma transformación en cada entrenamiento.
 
-## Reproducibilidad
+El preprocesamiento combina:
 
-La partición de datos se realiza con `train_test_split`, test de 20%, `random_state=42` y estratificación por target. El preprocesamiento se integra en un `ColumnTransformer`: las variables numéricas se imputan y escalan; las categóricas se imputan con la moda y se codifican mediante One-Hot Encoding con tolerancia a categorías desconocidas.
+- mediana y escalado para las variables numéricas;
+- moda y One-Hot Encoding para las categóricas;
+- tolerancia a categorías no vistas.
 
-Toda la lógica de entrenamiento se ejecuta desde `src/training/train.py`; el notebook queda limitado al EDA.
+## Separación de datos
 
-## Experimentación
+La división es estratificada y usa `random_state=42`:
 
-Se comparan seis configuraciones relevantes: un baseline `DummyClassifier`, tres variantes de regresión logística —incluyendo un threshold de 0,35— y dos Random Forest. Se registran Accuracy, Precision, Recall, F1, ROC-AUC y matriz de confusión.
+- 60% entrenamiento;
+- 20% validación;
+- 20% test.
 
-La mejor alternativa para el objetivo de negocio es `logreg_c1_t0.35`: Recall 0,6425, F1 0,5931, ROC-AUC 0,8120 y 133 falsos negativos. Con threshold 0,50 la misma regresión logística obtiene Recall 0,4516 y 204 falsos negativos. La reducción de falsos negativos justifica el threshold menor, aceptando más falsos positivos.
+Los seis modelos se comparan en validación. El test queda aislado hasta que el candidato ya fue elegido. Después, el modelo seleccionado se vuelve a ajustar con el 80% disponible y se evalúa una sola vez sobre test.
 
-La selección se formaliza mediante `0.50*Recall + 0.30*F1 + 0.20*ROC-AUC`, priorizando Recall porque un falso negativo representa un cliente que realmente abandonará pero no será detectado como riesgo.
+## Comparación y decisión
 
-## Trazabilidad con MLflow
+Se probaron un baseline, tres configuraciones de regresión logística y dos de Random Forest. Para la decisión se calculó `0,50*Recall + 0,30*F1 + 0,20*ROC-AUC`.
 
-`src/training/train.py` registra para cada Run parámetros, métricas, tags y el pipeline entrenado. El Run seleccionado se vincula con el modelo `customer-churn-candidate` en Model Registry mediante `--register-best`. Además, se guarda el `run_id` del candidato en `results/selected_model.json` al ejecutar el entrenamiento con MLflow.
+El mayor peso de Recall responde al costo del falso negativo: un cliente que realmente abandona queda fuera de una campaña de retención. No se usa Recall solo, porque un número excesivo de falsos positivos también tiene costo operativo.
 
-## Versionado de datos con DVC
+El mejor resultado de validación fue `rf_300_depth12_t0.5`:
 
-`customer_churn_historical.csv` está excluido de Git y acompañado por `data/raw/customer_churn_historical.csv.dvc`. El proyecto deja preparado un remote `dagshub` y un script de configuración. La URL real del repositorio y las credenciales deben completarse con las cuentas del equipo; no se almacenan secretos en Git.
+| Métrica de validación | Valor |
+|---|---:|
+| Precision | 0,523 |
+| Recall | 0,701 |
+| F1 | 0,599 |
+| ROC-AUC | 0,804 |
+| Falsos negativos | 111 |
 
-## Evidencias para la defensa
+Evaluación final sobre el test aislado:
 
-Antes de presentar, deben verificarse: tag Git `entrega-1`, remote DVC/DagsHub funcional, `dvc pull` reproducible, al menos seis Runs visibles en MLflow, modelo registrado y relación explícita con el Run de origen. El archivo `EVIDENCIAS_ENTREGA_1.md` funciona como checklist final.
+| Métrica de test | Valor |
+|---|---:|
+| Accuracy | 0,747 |
+| Precision | 0,516 |
+| Recall | 0,634 |
+| F1 | 0,569 |
+| ROC-AUC | 0,801 |
+| Falsos positivos | 221 |
+| Falsos negativos | 136 |
+
+La diferencia entre validación y test es esperable. Se informa sin volver a ajustar la selección sobre test, porque hacerlo contaminaría la evaluación final.
+
+## Trazabilidad
+
+MLflow recibe seis corridas de comparación y una corrida final. En cada una se guardan parámetros, métricas, pipeline, hash SHA-256 del dataset y commit de Git. La corrida final es la fuente del modelo `customer-churn-candidate` en Model Registry.
+
+El CSV histórico está ignorado por Git y referenciado por `data/raw/customer_churn_historical.csv.dvc`. Para cerrar la entrega falta reemplazar el remote de ejemplo por el proyecto real de DagsHub, hacer `dvc push` y verificar la recuperación desde otra copia del repositorio.
+
+## Limitaciones
+
+- La función de selección ponderada es una decisión académica; en un caso real debería definirse con costos de campaña y pérdida de clientes.
+- No se hizo una búsqueda exhaustiva de hiperparámetros.
+- Todavía no hay validación temporal: el dataset histórico se divide de forma aleatoria y estratificada.
+- Las evidencias remotas de GitHub, DagsHub y MLflow dependen de las cuentas del equipo y deben completarse antes de entregar.

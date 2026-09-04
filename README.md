@@ -1,157 +1,126 @@
-# Primer Parcial — Laboratorio de Minería de Datos
-## Proyecto reproducible: Git + DVC + MLflow + Model Registry
+# Customer Churn - Entrega 1
 
-**Caso:** predicción de Customer Churn en telecomunicaciones.  
-**Entrega:** Primer Parcial / Entrega 1.  
-**Objetivo:** transformar el dataset histórico y el análisis exploratorio en un proyecto Python reproducible, versionado y trazable, finalizando con un modelo candidato registrable en MLflow Model Registry.
+Proyecto del primer parcial de Laboratorio de Minería de Datos. El objetivo es predecir abandono de clientes de una empresa de telecomunicaciones y dejar trazabilidad entre datos, código, experimentos y modelo.
 
-## 1. Qué incluye esta entrega
+## Datos
 
-- Estructura modular de proyecto Python.
-- Dataset histórico preparado para tracking con DVC (el CSV está ignorado por Git).
-- EDA reproducible y resumen de calidad de datos.
-- Split train/test estratificado y reproducible (`random_state=42`, test=20%).
-- `Pipeline` de scikit-learn con imputación, encoding y escalado.
-- Exclusión explícita de `customerID` como predictor.
-- Seis configuraciones de experimentación: baseline, regresión logística, random forest y ajuste de threshold.
-- Registro de parámetros, métricas, tags y modelo en MLflow.
-- Selección justificada del candidato y opción de alta en Model Registry.
-- Archivos de resultados obtenidos con la misma partición reproducible.
-- Scripts para configurar DVC/DagsHub sin guardar secretos en el repositorio.
+El archivo de entrenamiento es `data/raw/customer_churn_historical.csv`: 7.043 filas, 21 columnas y una tasa de churn de 26,37%. `customerID` se elimina antes de entrenar porque es un identificador. Los 26 faltantes de `TotalCharges` se imputan dentro del pipeline.
 
-## 2. Dataset y EDA
-
-Se utiliza `data/raw/customer_churn_historical.csv` (7.043 filas, 21 columnas). El target es `Churn` (`Yes`/`No`). El identificador `customerID` no se utiliza como feature. `TotalCharges` contiene faltantes intencionales y se imputa dentro del pipeline.
-
-La distribución del target es aproximadamente 73,63% `No` y 26,37% `Yes`, por lo que Accuracy no se usa como única métrica. El detalle reproducible está en `results/eda_summary.md` y se genera con:
+Para regenerar el resumen exploratorio:
 
 ```bash
 python scripts/eda.py
 ```
 
-> `data/production/customer_churn_current.csv` queda reservado para la etapa final de monitoreo/drift y no se usa para entrenar ni seleccionar el modelo.
+El resultado queda en `results/eda_summary.md`.
 
-## 3. Pipeline de Machine Learning
+## Preparación y partición
 
-Flujo implementado:
+El preprocesamiento se implementa con `Pipeline` y `ColumnTransformer` de scikit-learn:
 
-```text
-Raw Data
-  → drop customerID
-  → train/test split estratificado
-  → numéricas: imputación mediana + StandardScaler
-  → categóricas: imputación moda + OneHotEncoder(handle_unknown="ignore")
-  → estimador
-  → probabilidad de Churn
-  → threshold
-  → predicción
-```
+- variables numéricas: imputación por mediana y estandarización;
+- variables categóricas: imputación por moda y One-Hot Encoding;
+- categorías nuevas: `handle_unknown="ignore"`.
 
-El preprocesamiento vive dentro de `sklearn.Pipeline`/`ColumnTransformer`, de modo que entrenamiento e inferencia reutilizan las mismas transformaciones.
+Se usa una partición estratificada 60/20/20:
 
-## 4. Modelos y experimentos
+- 60% para ajustar las alternativas;
+- 20% de validación para comparar modelos y elegir el threshold;
+- 20% de test, que se consulta una sola vez después de elegir el candidato.
 
-Se definieron seis Runs relevantes:
+Todos los splits usan `random_state=42`.
 
-| Run | Familia | Threshold |
-|---|---|---:|
-| `dummy_most_frequent` | Baseline | 0.50 |
-| `logreg_c0.5_t0.5` | Regresión logística | 0.50 |
-| `logreg_c1_t0.5` | Regresión logística | 0.50 |
-| `logreg_c1_t0.35` | Regresión logística + threshold | 0.35 |
-| `rf_200_t0.5` | Random Forest | 0.50 |
-| `rf_300_depth12_t0.5` | Random Forest | 0.50 |
+## Experimentos
 
-Métricas: Accuracy, Precision, Recall, F1, ROC-AUC y matriz de confusión (TN/FP/FN/TP).
+Se comparan seis configuraciones en validación:
 
-### Resultados reproducidos
+| Configuración | Precision | Recall | F1 | ROC-AUC |
+|---|---:|---:|---:|---:|
+| Dummy (baseline) | 0,000 | 0,000 | 0,000 | 0,500 |
+| Logistic Regression, C=0,5 | 0,653 | 0,477 | 0,551 | 0,822 |
+| Logistic Regression, C=1 | 0,657 | 0,480 | 0,555 | 0,821 |
+| Logistic Regression, C=1, threshold=0,35 | 0,543 | 0,666 | 0,598 | 0,821 |
+| Random Forest, 200 árboles | 0,553 | 0,620 | 0,584 | 0,797 |
+| Random Forest, 300 árboles, profundidad 12 | 0,523 | 0,701 | 0,599 | 0,804 |
 
-| Run | Precision | Recall | F1 | ROC-AUC | FN |
-|---|---:|---:|---:|---:|---:|
-| dummy_most_frequent | 0.0000 | 0.0000 | 0.0000 | 0.5000 | 372 |
-| logreg_c0.5_t0.5 | 0.6601 | 0.4489 | 0.5344 | 0.8120 | 205 |
-| logreg_c1_t0.5 | 0.6640 | 0.4516 | 0.5376 | 0.8120 | 204 |
-| **logreg_c1_t0.35** | **0.5507** | **0.6425** | **0.5931** | **0.8120** | **133** |
-| rf_200_t0.5 | 0.6413 | 0.3844 | 0.4807 | 0.7906 | 229 |
-| rf_300_depth12_t0.5 | 0.5722 | 0.5860 | 0.5790 | 0.8030 | 154 |
-
-## 5. Decisión de negocio y modelo candidato
-
-En churn, un **falso negativo** implica clasificar como estable a un cliente que efectivamente abandonará. Ese error puede impedir que el cliente sea incluido en una acción de retención. Por eso la selección no se guía por Accuracy solamente y se prioriza Recall sin ignorar F1 y ROC-AUC.
-
-El candidato propuesto es **Logistic Regression (`C=1`) con threshold 0,35**. Frente al threshold 0,50, el Recall aumenta de ~0,452 a ~0,642 y los falsos negativos bajan de 204 a 133, manteniendo ROC-AUC ~0,812. El costo es una caída de Precision y un aumento de falsos positivos; ese trade-off se considera razonable para una etapa de detección temprana de riesgo.
-
-El script usa un score de selección explícito:
+Para ordenar las alternativas se usa:
 
 ```text
-0.50 × Recall + 0.30 × F1 + 0.20 × ROC-AUC
+0,50 * Recall + 0,30 * F1 + 0,20 * ROC-AUC
 ```
 
-## 6. Instalación
+Recall tiene mayor peso porque un falso negativo es un cliente que va a abandonar y no sería incluido en una acción de retención. Precision y F1 siguen siendo relevantes: bajar falsos negativos a cualquier costo produciría demasiadas acciones comerciales innecesarias.
+
+El candidato elegido en validación es `rf_300_depth12_t0.5`. Luego se reajusta con train + validación y se evalúa una sola vez en test:
+
+| Precision | Recall | F1 | ROC-AUC | FP | FN |
+|---:|---:|---:|---:|---:|---:|
+| 0,516 | 0,634 | 0,569 | 0,801 | 221 | 136 |
+
+La corrida final es una séptima corrida y es la que se registra como `customer-churn-candidate`. Así quedan separados el proceso de selección y la medición final.
+
+## Instalación
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-# .venv\Scripts\activate         # Windows PowerShell
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 7. DVC + DagsHub
+Windows PowerShell:
 
-Inicialización / validación:
-
-```bash
-dvc init
-# Si el archivo ya está preparado, verificarlo:
-dvc status
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-Configurar el remote DagsHub sin guardar credenciales en Git:
+## DVC y DagsHub
+
+El CSV histórico no está versionado por Git; lo referencia `data/raw/customer_churn_historical.csv.dvc`.
+
+La URL incluida en `.dvc/config` es sólo un marcador. Antes de entregar hay que configurar la URL real del proyecto:
 
 ```bash
 export DAGSHUB_DVC_URL="https://dagshub.com/USUARIO/REPOSITORIO.dvc"
 bash scripts/configure_dagshub.sh
-```
-
-Luego:
-
-```bash
-dvc add data/raw/customer_churn_historical.csv
-git add data/raw/customer_churn_historical.csv.dvc data/raw/.gitignore .dvc/config
-git commit -m "Track historical churn dataset with DVC"
 dvc push
 ```
 
-Las credenciales de DagsHub deben configurarse fuera del repositorio (`.dvc/config.local`, credential helper o variables de entorno).
-
-## 8. MLflow y Model Registry
-
-### Opción A — MLflow local reproducible
+Las credenciales deben quedar fuera de Git. Para comprobar que otra máquina puede recuperar el archivo:
 
 ```bash
-python -m src.training.train \
-  --data data/raw/customer_churn_historical.csv \
-  --experiment customer-churn-entrega-1 \
-  --register-best
+dvc pull
+dvc status
 ```
 
-Por defecto utiliza `sqlite:///mlflow.db`, que permite conservar los Runs y el Registry localmente.
+## Entrenamiento y MLflow
 
-UI:
+Ejecución local con registro del candidato:
+
+```bash
+python -m src.training.train --register-best
+```
+
+El backend local por defecto es `sqlite:///mlflow.db`. Para abrir la interfaz:
 
 ```bash
 mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 ```
 
-### Opción B — MLflow remoto en DagsHub
+Para usar DagsHub se debe definir `MLFLOW_TRACKING_URI` y la autenticación correspondiente antes de ejecutar el mismo comando. Cada corrida guarda parámetros, métricas, tags de commit/dataset y el pipeline completo. La corrida final origina la versión registrada en Model Registry.
 
-Configurar `MLFLOW_TRACKING_URI` y autenticación según el repositorio DagsHub del equipo y ejecutar el mismo comando. No se incluyen tokens ni claves en este proyecto.
+Los CSV y JSON generados por cada ejecución se guardan en `results/generated/`. Esa carpeta es local y se puede regenerar; la evidencia principal queda en MLflow.
 
-## 9. Reproducción end-to-end de la Entrega 1
+## Reproducción desde cero
 
 ```bash
-git clone <URL_REPOSITORIO_GITHUB>
-cd <REPOSITORIO>
+git clone https://github.com/giselle1990/entregaPrimerParcial.git
+cd entregaPrimerParcial
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -160,58 +129,27 @@ python scripts/eda.py
 python -m src.training.train --register-best
 ```
 
-Para la demostración del parcial debe poder mostrarse:
+En Windows cambia únicamente el comando de activación del entorno.
 
-1. `git log` y tag `entrega-1`.
-2. `dvc status` / `dvc pull` y remote DagsHub funcional.
-3. Seis Runs comparables en MLflow.
-4. Parámetros, métricas y artefactos de cada Run.
-5. Modelo candidato en Model Registry y su `run_id` de origen.
-6. Ejecución de training desde Python sin abrir el notebook.
-
-## 10. Git y tag de entrega
-
-Sobre el commit exacto presentado:
-
-```bash
-git add .
-git commit -m "Entrega 1: proyecto reproducible Git DVC MLflow Registry"
-git tag entrega-1
-git push origin main
-git push origin entrega-1
-```
-
-## 11. Estructura
+## Estructura principal
 
 ```text
-.
-├── data/
-│   ├── raw/
-│   ├── production/
-│   └── scoring/
-├── metadata/
-├── examples/
-├── notebooks/
-├── src/
-│   ├── data/
-│   ├── features/
-│   ├── training/
-│   ├── evaluation/
-│   └── inference/
-├── models/
-├── results/
-├── scripts/
-├── .dvc/
-├── requirements.txt
-└── README.md
+data/                  datos gestionados por DVC
+metadata/              esquema y diccionario de datos
+notebooks/01_eda.ipynb exploración inicial
+scripts/               comandos auxiliares
+src/data/              carga y validación del dataset
+src/features/          preprocesamiento
+src/evaluation/        métricas
+src/training/          entrenamiento y experimentación
+results/               resultados reproducibles
 ```
 
-## 12. Pendientes que dependen de las cuentas del equipo
+## Antes de entregar
 
-Este paquete deja preparada la entrega, pero **no puede completar por sí solo** tres evidencias externas porque requieren credenciales/URLs del equipo:
+Todavía requieren configuración o evidencia externa:
 
-- repositorio GitHub remoto y acceso para el profesor;
-- remote DVC real en DagsHub y `dvc push` exitoso;
-- proyecto/Tracking URI de MLflow en DagsHub, si se exige evidencia remota.
-
-Una vez configuradas esas cuentas, ejecutar los comandos anteriores, verificar las evidencias y crear/pushear el tag `entrega-1`.
+- reemplazar el remote DVC de ejemplo por el de DagsHub y comprobar `dvc push`/`dvc pull`;
+- ejecutar las corridas en el Tracking Server que se mostrará en la defensa;
+- completar `EVIDENCIAS_ENTREGA_1.md` con URLs, versión y run ID reales;
+- comprobar la reproducción desde una segunda copia del repositorio.

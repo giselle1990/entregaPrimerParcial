@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 from typing import Any
 
-import joblib
 import mlflow
 import mlflow.sklearn
 import pandas as pd
@@ -15,6 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+from sklearn.base import clone
 
 from src.data.load import load_training_data
 from src.evaluation.metrics import evaluate_binary
@@ -22,6 +24,7 @@ from src.features.pipeline import build_preprocessor
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.20
+VALIDATION_SIZE = 0.25  # 25% del 80% restante: 60/20/20 final.
 MODEL_NAME = "customer-churn-candidate"
 
 
@@ -85,21 +88,58 @@ def configure_mlflow(experiment: str) -> None:
     mlflow.set_experiment(experiment)
 
 
+def file_sha256(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def git_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def git_is_dirty() -> bool:
+    try:
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        return bool(status.strip())
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return True
+
+
 def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.DataFrame:
     configure_mlflow(experiment)
     X, y = load_training_data(data_path)
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_train_val, X_test, y_train_val, y_test = train_test_split(
         X,
         y,
         test_size=TEST_SIZE,
         random_state=RANDOM_STATE,
         stratify=y,
     )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_train_val,
+        y_train_val,
+        test_size=VALIDATION_SIZE,
+        random_state=RANDOM_STATE,
+        stratify=y_train_val,
+    )
 
     results: list[dict[str, Any]] = []
-    fitted_models: dict[str, Pipeline] = {}
-    run_ids: dict[str, str] = {}
+    dataset_hash = file_sha256(data_path)
+    commit = git_commit()
+    dirty_worktree = git_is_dirty()
 
     for config in model_candidates():
         pipeline = Pipeline(
@@ -111,8 +151,8 @@ def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.
 
         with mlflow.start_run(run_name=config["run_name"]) as run:
             pipeline.fit(X_train, y_train)
-            probabilities = pipeline.predict_proba(X_test)[:, 1]
-            metrics = evaluate_binary(y_test, probabilities, threshold=config["threshold"])
+            probabilities = pipeline.predict_proba(X_val)[:, 1]
+            metrics = evaluate_binary(y_val, probabilities, threshold=config["threshold"])
 
             mlflow.log_params(
                 {
@@ -120,14 +160,18 @@ def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.
                     "threshold": config["threshold"],
                     "random_state": RANDOM_STATE,
                     "test_size": TEST_SIZE,
+                    "validation_size_within_train": VALIDATION_SIZE,
                     "stratified_split": True,
                     **{f"model__{k}": v for k, v in config["model"].get_params(deep=False).items() if isinstance(v, (str, int, float, bool)) or v is None},
                 }
             )
-            mlflow.log_metrics(metrics.to_dict())
+            mlflow.log_metrics({f"val_{key}": value for key, value in metrics.to_dict().items()})
             mlflow.set_tags(
                 {
                     "dataset": "customer_churn_historical.csv",
+                    "dataset_sha256": dataset_hash,
+                    "git_commit": commit,
+                    "git_worktree_dirty": str(dirty_worktree).lower(),
                     "target": "Churn",
                     "business_focus": "reduce_false_negatives",
                     "customerID_used_as_feature": "false",
@@ -137,19 +181,19 @@ def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.
             input_example = X_train.head(3)
             mlflow.sklearn.log_model(
                 sk_model=pipeline,
-                artifact_path="model",
+                name="model",
                 input_example=input_example,
+                serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
             )
 
             row = {
                 "run_name": config["run_name"],
                 "run_id": run.info.run_id,
+                "evaluation_split": "validation",
                 "threshold": config["threshold"],
                 **metrics.to_dict(),
             }
             results.append(row)
-            fitted_models[config["run_name"]] = pipeline
-            run_ids[config["run_name"]] = run.info.run_id
 
     results_df = pd.DataFrame(results)
 
@@ -159,35 +203,94 @@ def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.
     eligible["selection_score"] = 0.50 * eligible["recall"] + 0.30 * eligible["f1"] + 0.20 * eligible["roc_auc"]
     best = eligible.sort_values(["selection_score", "roc_auc"], ascending=False).iloc[0]
     best_name = str(best["run_name"])
+    best_config = next(config for config in model_candidates() if config["run_name"] == best_name)
 
-    Path("results").mkdir(exist_ok=True)
-    results_df.to_csv("results/experiment_results.csv", index=False)
-    with open("results/selected_model.json", "w", encoding="utf-8") as f:
+    final_pipeline = Pipeline(
+        steps=[
+            ("preprocessor", build_preprocessor(list(X.columns))),
+            ("model", clone(best_config["model"])),
+        ]
+    )
+
+    with mlflow.start_run(run_name=f"final_{best_name}") as final_run:
+        final_pipeline.fit(X_train_val, y_train_val)
+        test_probabilities = final_pipeline.predict_proba(X_test)[:, 1]
+        test_metrics = evaluate_binary(
+            y_test, test_probabilities, threshold=float(best["threshold"])
+        )
+        final_run_id = final_run.info.run_id
+
+        mlflow.log_params(
+            {
+                "selected_candidate": best_name,
+                "threshold": float(best["threshold"]),
+                "selection_criterion": "0.50*recall + 0.30*f1 + 0.20*roc_auc",
+                "random_state": RANDOM_STATE,
+                "test_size": TEST_SIZE,
+                **{
+                    f"model__{key}": value
+                    for key, value in best_config["model"].get_params(deep=False).items()
+                    if isinstance(value, (str, int, float, bool)) or value is None
+                },
+            }
+        )
+        mlflow.log_metrics(
+            {f"test_{key}": value for key, value in test_metrics.to_dict().items()}
+        )
+        mlflow.set_tags(
+            {
+                "stage": "final_candidate",
+                "dataset": "customer_churn_historical.csv",
+                "dataset_sha256": dataset_hash,
+                "git_commit": commit,
+                "git_worktree_dirty": str(dirty_worktree).lower(),
+                "selected_on": "validation",
+                "customerID_used_as_feature": "false",
+            }
+        )
+        final_model_info = mlflow.sklearn.log_model(
+            sk_model=final_pipeline,
+            name="model",
+            input_example=X_train_val.head(3),
+            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+        )
+
+    output_dir = Path("results/generated")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results_df.to_csv(output_dir / "experiment_results.csv", index=False)
+    with open(output_dir / "final_test_metrics.json", "w", encoding="utf-8") as f:
+        json.dump(test_metrics.to_dict(), f, indent=2)
+    with open(output_dir / "selected_model.json", "w", encoding="utf-8") as f:
         json.dump(
             {
                 "model_name": best_name,
-                "run_id": run_ids[best_name],
+                "registered_model_name": MODEL_NAME,
+                "run_id": final_run_id,
                 "threshold": float(best["threshold"]),
                 "selection_score": float(best["selection_score"]),
                 "criterion": "0.50*recall + 0.30*f1 + 0.20*roc_auc",
+                "selected_on": "validation",
+                "final_evaluation": "test",
+                "dataset_sha256": dataset_hash,
+                "git_commit": commit,
+                "git_worktree_dirty": dirty_worktree,
             },
             f,
             indent=2,
         )
 
-    Path("models").mkdir(exist_ok=True)
-    joblib.dump(
-        {"pipeline": fitted_models[best_name], "threshold": float(best["threshold"]), "run_id": run_ids[best_name]},
-        "models/customer_churn_candidate.joblib",
-    )
-
     if register_best:
-        model_uri = f"runs:/{run_ids[best_name]}/model"
-        registered = mlflow.register_model(model_uri=model_uri, name=MODEL_NAME)
-        print(f"Modelo registrado: {MODEL_NAME}, versión={registered.version}, run_id={run_ids[best_name]}")
+        registered = mlflow.register_model(
+            model_uri=final_model_info.model_uri,
+            name=MODEL_NAME,
+        )
+        print(f"Modelo registrado: {MODEL_NAME}, versión={registered.version}, run_id={final_run_id}")
 
+    print("Resultados de validación:")
     print(results_df.sort_values("recall", ascending=False).to_string(index=False))
-    print(f"\nCandidato seleccionado: {best_name} | run_id={run_ids[best_name]}")
+    print("\nEvaluación final sobre test aislado:")
+    print(pd.Series(test_metrics.to_dict()).to_string())
+    print(f"\nCandidato seleccionado: {best_name} | run_id final={final_run_id}")
     return results_df
 
 

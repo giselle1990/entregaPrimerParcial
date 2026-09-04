@@ -4,6 +4,8 @@
 - Tipos: **17 categóricas/objeto** y **4 numéricas**.
 - Target `Churn`: No=5186 (73.63%), Yes=1857 (26.37%).
 - Faltantes: TotalCharges=26.
+- IDs duplicados: 0; filas duplicadas: 0.
+- Casos con `tenure=0`: 30; casos con `TotalCharges=0`: 4.
 - `customerID` se excluye del conjunto de features por ser identificador.
 - `TotalCharges` se imputa dentro del pipeline para evitar tratamiento manual inconsistente.
 
@@ -35,3 +37,7 @@
 | DSL               | 80.03 | 19.97 |
 | Fiber optic       | 59.75 | 40.25 |
 | No                | 92.38 |  7.62 |
+
+## Lectura inicial
+
+El churn es mayor en contratos mes a mes (38,73%) que en contratos de dos años (8,97%). También es mayor entre clientes con fibra óptica (40,25%) que entre quienes no tienen Internet (7,62%). Estas asociaciones sirven para orientar el análisis, pero no prueban causalidad.

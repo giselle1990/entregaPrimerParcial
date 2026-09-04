@@ -12,14 +12,11 @@ venv/
 
 # Datos versionados con DVC (no Git)
 /data/raw/*.csv
-/data/production/*.csv
-/data/scoring/*.csv
 
 # Artefactos locales
 /mlruns/
 /mlartifacts/
 *.db
-/models/*.joblib
 /results/generated/
 
 # DVC cache/config local sensible
