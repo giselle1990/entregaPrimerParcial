@@ -1,8 +1,9 @@
 from pathlib import Path
 import pandas as pd
 
-DATA = Path("data/raw/customer_churn_historical.csv")
-OUT = Path("results/eda_summary.md")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA = PROJECT_ROOT / "data" / "raw" / "customer_churn_historical.csv"
+OUT = PROJECT_ROOT / "results" / "eda_summary.md"
 
 df = pd.read_csv(DATA)
 missing = df.isna().sum()
