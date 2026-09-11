@@ -16,7 +16,7 @@
 
 - [x] URL del repositorio GitHub: `https://github.com/giselle1990/entregaPrimerParcial`
 - [x] El repositorio es público y tiene acceso para el profesor.
-- [x] El tag `entrega-1` apunta al commit definitivo.
+- [x] El tag `entrega-1-final` apunta al commit definitivo de esta revisión.
 - [x] URL del proyecto DagsHub: `https://dagshub.com/giselle.san/entregaPrimerParcial`
 - [x] `.dvc/config` contiene el remote real, no `USUARIO/REPOSITORIO`.
 - [x] `dvc push` termina correctamente con `Everything is up to date`.
