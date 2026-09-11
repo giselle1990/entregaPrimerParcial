@@ -62,7 +62,7 @@ MLflow recibe seis corridas de comparación y una corrida final. En cada una se 
 
 El pipeline completo también se serializa como `models/churn_pipeline.joblib`, de acuerdo con el flujo trabajado en clase. El módulo `src/inference/predict.py` carga ese artefacto y genera predicciones sin volver a entrenar.
 
-El CSV histórico está ignorado por Git y referenciado por `data/raw/customer_churn_historical.csv.dvc`. El remote ya apunta a `https://dagshub.com/giselle.san/entregaPrimerParcial.dvc` y `dvc push` fue comprobado. Falta verificar la recuperación desde una segunda copia del repositorio.
+El CSV histórico está ignorado por Git y referenciado por `data/raw/customer_churn_historical.csv.dvc`. El remote apunta a `https://dagshub.com/giselle.san/entregaPrimerParcial.dvc`. La recuperación se comprobó desde una segunda copia del repositorio: con credenciales locales, `dvc pull` descargó el CSV y luego se ejecutaron el EDA y los tests.
 
 La carpeta `app/` se conserva como lugar para una API futura, tal como indican las clases. Esta entrega mantiene una inferencia sencilla por consola y dos pruebas automáticas para métricas y preprocesamiento.
 

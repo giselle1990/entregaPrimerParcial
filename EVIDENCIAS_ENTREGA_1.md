@@ -20,7 +20,7 @@
 - [x] URL del proyecto DagsHub: `https://dagshub.com/giselle.san/entregaPrimerParcial`
 - [x] `.dvc/config` contiene el remote real, no `USUARIO/REPOSITORIO`.
 - [x] `dvc push` termina correctamente con `Everything is up to date`.
-- [ ] Otra copia del repositorio puede ejecutar `dvc pull`.
+- [x] Otra copia del repositorio ejecutó `dvc pull` con credenciales locales, recuperó el CSV y pudo correr el EDA y los tests.
 - [x] URL del experimento MLflow remoto: `https://dagshub.com/giselle.san/entregaPrimerParcial.mlflow`
 - [ ] Se ven las siete corridas en el servidor que se mostrará en la defensa.
 - [ ] Versión remota registrada: `________`.
