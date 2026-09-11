@@ -8,17 +8,20 @@
 - [x] El código registra `customer-churn-candidate` en Model Registry al usar `--register-best`.
 - [x] El test queda aislado hasta la evaluación final.
 - [x] El README incluye instalación y reproducción.
+- [x] Las pruebas automáticas simples terminan correctamente.
+- [x] El pipeline completo se guarda en `models/churn_pipeline.joblib`.
+- [x] La inferencia se ejecuta desde `src/inference/predict.py`.
 
 ## Falta completar con las cuentas del equipo
 
 - [x] URL del repositorio GitHub: `https://github.com/giselle1990/entregaPrimerParcial`
 - [x] El repositorio es público y tiene acceso para el profesor.
 - [x] El tag `entrega-1` apunta al commit definitivo.
-- [ ] URL del proyecto DagsHub: `____________________________`
-- [ ] `.dvc/config` contiene el remote real, no `USUARIO/REPOSITORIO`.
-- [ ] `dvc push` termina correctamente.
+- [x] URL del proyecto DagsHub: `https://dagshub.com/giselle.san/entregaPrimerParcial`
+- [x] `.dvc/config` contiene el remote real, no `USUARIO/REPOSITORIO`.
+- [x] `dvc push` termina correctamente con `Everything is up to date`.
 - [ ] Otra copia del repositorio puede ejecutar `dvc pull`.
-- [ ] URL del experimento MLflow remoto: `____________________________`
+- [x] URL del experimento MLflow remoto: `https://dagshub.com/giselle.san/entregaPrimerParcial.mlflow`
 - [ ] Se ven las siete corridas en el servidor que se mostrará en la defensa.
 - [ ] Versión remota registrada: `________`.
 - [ ] Run ID remoto de origen: `________________________________`.
