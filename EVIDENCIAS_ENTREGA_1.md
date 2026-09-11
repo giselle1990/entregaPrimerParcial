@@ -16,16 +16,21 @@
 
 - [x] URL del repositorio GitHub: `https://github.com/giselle1990/entregaPrimerParcial`
 - [x] El repositorio es público y tiene acceso para el profesor.
-- [x] El tag `entrega-1-final` apunta al commit definitivo de esta revisión.
+- [x] El tag requerido `entrega-1` apunta al commit definitivo de esta revisión.
 - [x] URL del proyecto DagsHub: `https://dagshub.com/giselle.san/entregaPrimerParcial`
 - [x] `.dvc/config` contiene el remote real, no `USUARIO/REPOSITORIO`.
 - [x] `dvc push` termina correctamente con `Everything is up to date`.
 - [x] Otra copia del repositorio ejecutó `dvc pull` con credenciales locales, recuperó el CSV y pudo correr el EDA y los tests.
 - [x] URL del experimento MLflow remoto: `https://dagshub.com/giselle.san/entregaPrimerParcial.mlflow`
-- [ ] Se ven las siete corridas en el servidor que se mostrará en la defensa.
-- [ ] Versión remota registrada: `________`.
-- [ ] Run ID remoto de origen: `________________________________`.
+- [x] Se ven las siete corridas completas en el servidor que se mostrará en la defensa.
+- [x] Versión remota registrada: `3`.
+- [x] Run ID remoto de origen: `a9013766e57641cc9fa53de5d72b92cd`.
 - [ ] Otro integrante reprodujo el flujo completo.
+
+La corrida final puede consultarse en:
+`https://dagshub.com/giselle.san/entregaPrimerParcial.mlflow/#/experiments/0/runs/a9013766e57641cc9fa53de5d72b92cd`.
+
+Además de las siete corridas completas quedó una corrida inicial adicional de `dummy_most_frequent`, porque Windows interrumpió el primer intento al imprimir un carácter de consola. Esa corrida no intervino en la selección final.
 
 ## Comprobaciones rápidas antes del cierre
 

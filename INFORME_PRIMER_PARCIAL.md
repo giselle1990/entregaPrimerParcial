@@ -58,7 +58,7 @@ La diferencia entre validación y test es esperable. Se informa sin volver a aju
 
 ## Trazabilidad
 
-MLflow recibe seis corridas de comparación y una corrida final. En cada una se guardan parámetros, métricas, pipeline, hash SHA-256 del dataset y commit de Git. La corrida final es la fuente del modelo `customer-churn-candidate` en Model Registry.
+MLflow recibe seis corridas de comparación y una corrida final. En cada una se guardan parámetros, métricas, pipeline, hash SHA-256 del dataset y commit de Git. La ejecución remota verificada registró `customer-churn-candidate` versión 3. Su corrida de origen es `a9013766e57641cc9fa53de5d72b92cd`.
 
 El pipeline completo también se serializa como `models/churn_pipeline.joblib`, de acuerdo con el flujo trabajado en clase. El módulo `src/inference/predict.py` carga ese artefacto y genera predicciones sin volver a entrenar.
 

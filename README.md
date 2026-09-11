@@ -114,6 +114,8 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 
 Para usar DagsHub se debe definir `MLFLOW_TRACKING_URI` y la autenticación correspondiente antes de ejecutar el mismo comando. Cada corrida guarda parámetros, métricas, tags de commit/dataset y el pipeline completo. La corrida final origina la versión registrada en Model Registry.
 
+La ejecución remota verificada registró `customer-churn-candidate` versión 3. Su corrida de origen es `a9013766e57641cc9fa53de5d72b92cd` y puede verse en [DagsHub MLflow](https://dagshub.com/giselle.san/entregaPrimerParcial.mlflow/#/experiments/0/runs/a9013766e57641cc9fa53de5d72b92cd).
+
 Los CSV y JSON generados por cada ejecución se guardan en `results/generated/`. Esa carpeta es local y se puede regenerar; la evidencia principal queda en MLflow.
 
 ## Modelo e inferencia
@@ -176,8 +178,4 @@ README.md              instalación, ejecución y arquitectura
 
 ## Antes de entregar
 
-Todavía requieren evidencia externa:
-
-- ejecutar las corridas en el Tracking Server que se mostrará en la defensa;
-- completar `EVIDENCIAS_ENTREGA_1.md` con URLs, versión y run ID reales;
-- comprobar la reproducción desde una segunda copia del repositorio.
+La configuración, las corridas remotas y la recuperación desde una segunda copia ya fueron comprobadas. Antes de entregar falta que otro integrante repita el flujo documentado y conserve la evidencia de esa prueba.
