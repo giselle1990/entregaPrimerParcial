@@ -60,7 +60,11 @@ La diferencia entre validación y test es esperable. Se informa sin volver a aju
 
 MLflow recibe seis corridas de comparación y una corrida final. En cada una se guardan parámetros, métricas, pipeline, hash SHA-256 del dataset y commit de Git. La corrida final es la fuente del modelo `customer-churn-candidate` en Model Registry.
 
-El CSV histórico está ignorado por Git y referenciado por `data/raw/customer_churn_historical.csv.dvc`. Para cerrar la entrega falta reemplazar el remote de ejemplo por el proyecto real de DagsHub, hacer `dvc push` y verificar la recuperación desde otra copia del repositorio.
+El pipeline completo también se serializa como `models/churn_pipeline.joblib`, de acuerdo con el flujo trabajado en clase. El módulo `src/inference/predict.py` carga ese artefacto y genera predicciones sin volver a entrenar.
+
+El CSV histórico está ignorado por Git y referenciado por `data/raw/customer_churn_historical.csv.dvc`. El remote ya apunta a `https://dagshub.com/giselle.san/entregaPrimerParcial.dvc` y `dvc push` fue comprobado. Falta verificar la recuperación desde una segunda copia del repositorio.
+
+La carpeta `app/` se conserva como lugar para una API futura, tal como indican las clases. Esta entrega mantiene una inferencia sencilla por consola y dos pruebas automáticas para métricas y preprocesamiento.
 
 ## Limitaciones
 

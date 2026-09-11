@@ -8,8 +8,10 @@ from pathlib import Path
 import subprocess
 from typing import Any
 
+import joblib
 import mlflow
 import mlflow.sklearn
+from mlflow.models import infer_signature
 import pandas as pd
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -26,6 +28,15 @@ RANDOM_STATE = 42
 TEST_SIZE = 0.20
 VALIDATION_SIZE = 0.25  # 25% del 80% restante: 60/20/20 final.
 MODEL_NAME = "customer-churn-candidate"
+MODEL_PATH = Path("models/churn_pipeline.joblib")
+
+
+def mlflow_input_example(features: pd.DataFrame, rows: int = 3) -> pd.DataFrame:
+    """Build an MLflow example whose numeric schema accepts missing values."""
+    example = features.head(rows).copy()
+    integer_columns = example.select_dtypes(include=["integer"]).columns
+    example[integer_columns] = example[integer_columns].astype("float64")
+    return example
 
 
 def model_candidates() -> list[dict[str, Any]]:
@@ -178,11 +189,12 @@ def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.
                 }
             )
 
-            input_example = X_train.head(3)
+            input_example = mlflow_input_example(X_train)
             mlflow.sklearn.log_model(
                 sk_model=pipeline,
                 name="model",
                 input_example=input_example,
+                signature=infer_signature(input_example),
                 serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
             )
 
@@ -248,12 +260,17 @@ def run_experiments(data_path: str, experiment: str, register_best: bool) -> pd.
                 "customerID_used_as_feature": "false",
             }
         )
+        final_input_example = mlflow_input_example(X_train_val)
         final_model_info = mlflow.sklearn.log_model(
             sk_model=final_pipeline,
             name="model",
-            input_example=X_train_val.head(3),
+            input_example=final_input_example,
+            signature=infer_signature(final_input_example),
             serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
         )
+
+    MODEL_PATH.parent.mkdir(exist_ok=True)
+    joblib.dump(final_pipeline, MODEL_PATH)
 
     output_dir = Path("results/generated")
     output_dir.mkdir(parents=True, exist_ok=True)

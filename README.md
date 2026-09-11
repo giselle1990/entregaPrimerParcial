@@ -83,17 +83,17 @@ pip install -r requirements.txt
 
 El CSV histórico no está versionado por Git; lo referencia `data/raw/customer_churn_historical.csv.dvc`.
 
-La URL incluida en `.dvc/config` es sólo un marcador. Antes de entregar hay que configurar la URL real del proyecto:
+El remote DVC ya apunta al proyecto real de DagsHub:
 
-```bash
-export DAGSHUB_DVC_URL="https://dagshub.com/USUARIO/REPOSITORIO.dvc"
-bash scripts/configure_dagshub.sh
-dvc push
+```text
+https://dagshub.com/giselle.san/entregaPrimerParcial.dvc
 ```
 
-Las credenciales deben quedar fuera de Git. Para comprobar que otra máquina puede recuperar el archivo:
+Las credenciales quedan en `.dvc/config.local`, que está ignorado por Git. Para comprobar el remote y sincronizar los datos:
 
 ```bash
+python -m dvc remote list
+python -m dvc push
 dvc pull
 dvc status
 ```
@@ -116,40 +116,68 @@ Para usar DagsHub se debe definir `MLFLOW_TRACKING_URI` y la autenticación corr
 
 Los CSV y JSON generados por cada ejecución se guardan en `results/generated/`. Esa carpeta es local y se puede regenerar; la evidencia principal queda en MLflow.
 
+## Modelo e inferencia
+
+Además del registro en MLflow, el entrenamiento guarda el pipeline completo en `models/churn_pipeline.joblib`. El artefacto contiene el preprocesamiento y el modelo, como se trabajó en clase.
+
+Para generar predicciones desde consola:
+
+```bash
+python -m src.inference.predict archivo_clientes.csv
+```
+
+El resultado se guarda en `results/predictions.csv`. La carpeta `app/` queda reservada para una futura API con FastAPI; no se agrega esa complejidad en esta entrega.
+
+## Pruebas
+
+```bash
+pytest
+```
+
+Las pruebas iniciales comprueban el preprocesamiento ante faltantes y categorías nuevas, y el cálculo de métricas.
+
 ## Reproducción desde cero
 
 ```bash
 git clone https://github.com/giselle1990/entregaPrimerParcial.git
 cd entregaPrimerParcial
 python -m venv .venv
-source .venv/bin/activate
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 dvc pull
 python scripts/eda.py
 python -m src.training.train --register-best
+pytest
 ```
 
-En Windows cambia únicamente el comando de activación del entorno.
+En Linux o macOS, el comando de activación es `source .venv/bin/activate`.
 
 ## Estructura principal
 
 ```text
-data/                  datos gestionados por DVC
+data/raw/              datos originales gestionados por DVC
+data/processed/        salidas intermedias
+data/reference/        datos de referencia
 metadata/              esquema y diccionario de datos
 notebooks/01_eda.ipynb exploración inicial
+app/                   espacio reservado para la futura API
+models/                artefacto joblib generado localmente
+tests/                 pruebas automáticas simples
 scripts/               comandos auxiliares
 src/data/              carga y validación del dataset
 src/features/          preprocesamiento
 src/evaluation/        métricas
 src/training/          entrenamiento y experimentación
+src/inference/         carga del pipeline y predicción
 results/               resultados reproducibles
+README.md              instalación, ejecución y arquitectura
+.env.example           variables necesarias sin secretos
 ```
 
 ## Antes de entregar
 
-Todavía requieren configuración o evidencia externa:
+Todavía requieren evidencia externa:
 
-- reemplazar el remote DVC de ejemplo por el de DagsHub y comprobar `dvc push`/`dvc pull`;
 - ejecutar las corridas en el Tracking Server que se mostrará en la defensa;
 - completar `EVIDENCIAS_ENTREGA_1.md` con URLs, versión y run ID reales;
 - comprobar la reproducción desde una segunda copia del repositorio.

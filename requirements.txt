@@ -6,3 +6,5 @@ mlflow>=3.0,<4
 dvc>=3.50,<4
 dvc-http>=2.32,<3
 tabulate>=0.9,<1
+pytest>=8.3,<9
+joblib>=1.4,<2

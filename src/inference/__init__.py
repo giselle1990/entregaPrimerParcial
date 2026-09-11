@@ -1,0 +1,1 @@
+"""Inferencia del modelo entrenado."""
